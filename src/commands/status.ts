@@ -4,7 +4,7 @@ import { cancelAutoOff } from "../system/launchd.js";
 import { getBattery, isSleepDisabled } from "../system/pmset.js";
 import { clearState, readState } from "../system/state.js";
 import { buildStatusPayload } from "../system/statusPayload.js";
-import { isSudoersConfigured } from "../system/sudoers.js";
+import { checkRuleEffective, isSudoersConfigured } from "../system/sudoers.js";
 import {
   type GlobalFlags,
   resolveFormat,
@@ -34,6 +34,7 @@ Examples:
         let state = readState();
         const battery = await getBattery();
         const sudoersConfigured = isSudoersConfigured();
+        const sudoersEffective = sudoersConfigured ? await checkRuleEffective() : false;
 
         // Self-heal: state file left behind but the switch is off.
         if (!enabled && state) {
@@ -47,6 +48,7 @@ Examples:
           state,
           battery,
           sudoersConfigured,
+          sudoersEffective,
         );
 
         if (format === "json") {
@@ -98,6 +100,10 @@ Examples:
         if (!sudoersConfigured) {
           console.log(
             `    ${chalk.yellow("▲")} setup needed before toggling works: ${chalk.bold("awake setup")}`,
+          );
+        } else if (sudoersEffective === false) {
+          console.log(
+            `    ${chalk.yellow("▲")} rule file present but sudo ignores it - run ${chalk.bold("awake setup")} to repair`,
           );
         }
         console.log("");

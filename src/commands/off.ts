@@ -5,7 +5,7 @@ import { notify } from "../system/notify.js";
 import { getBattery, isSleepDisabled, setSleepDisabled } from "../system/pmset.js";
 import { clearState, readState } from "../system/state.js";
 import { buildStatusPayload } from "../system/statusPayload.js";
-import { isSudoersConfigured } from "../system/sudoers.js";
+import { checkRuleEffective, isSudoersConfigured } from "../system/sudoers.js";
 import {
   type GlobalFlags,
   resolveFormat,
@@ -79,6 +79,7 @@ Examples:
               null,
               await getBattery(),
               isSudoersConfigured(),
+              await checkRuleEffective(),
             );
             printJson({ ...payload, was_enabled: wasEnabled, reason });
           }

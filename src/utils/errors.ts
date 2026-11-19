@@ -37,7 +37,11 @@ export class UnsupportedPlatformError extends CLIError {
   }
 }
 
-export function handleError(error: unknown, format: OutputFormat): never {
+// Sets process.exitCode and returns instead of calling process.exit():
+// exiting synchronously can truncate piped stdout/stderr (notably the
+// --json error envelopes the menu bar app parses). All call sites are
+// terminal catch blocks, so Node flushes and exits with this code.
+export function handleError(error: unknown, format: OutputFormat): void {
   if (error instanceof CLIError) {
     if (format === "json") {
       printJsonError(error.code, error.message, error.hint);
@@ -48,7 +52,8 @@ export function handleError(error: unknown, format: OutputFormat): never {
       }
       console.error();
     }
-    process.exit(error.exitCode);
+    process.exitCode = error.exitCode;
+    return;
   }
 
   const message = error instanceof Error ? error.message : String(error);
@@ -58,5 +63,5 @@ export function handleError(error: unknown, format: OutputFormat): never {
     console.error(`\n  ${chalk.red("error")} ${message}\n`);
   }
 
-  process.exit(1);
+  process.exitCode = 1;
 }

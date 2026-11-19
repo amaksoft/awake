@@ -1,5 +1,6 @@
 import { exec } from "../utils/exec.js";
-import { SetupRequiredError } from "../utils/errors.js";
+import { type ExecFn, isSudoersConfigured } from "./sudoers.js";
+import { CLIError, SetupRequiredError } from "../utils/errors.js";
 
 const PMSET = "/usr/bin/pmset";
 const SUDO = "/usr/bin/sudo";
@@ -11,13 +12,35 @@ export async function isSleepDisabled(): Promise<boolean> {
   return /SleepDisabled\s+1/.test(stdout);
 }
 
-export async function setSleepDisabled(disabled: boolean): Promise<void> {
-  const result = await exec(
+export async function setSleepDisabled(
+  disabled: boolean,
+  run: ExecFn = exec,
+  configured: boolean = isSudoersConfigured(),
+): Promise<void> {
+  const result = await run(
     SUDO,
     ["-n", PMSET, "-a", "disablesleep", disabled ? "1" : "0"],
     { allowFailure: true },
   );
   if (result.code !== 0) {
+    // sudo propagates the child's exit code, so classify by stderr source:
+    // lines from sudo itself ("sudo: ...") mean auth/policy failure - anything
+    // else is pmset failing on its own terms, which `awake setup` cannot fix.
+    const detail = result.stderr.trim().slice(0, 300);
+    const sudoOwn = /^\s*sudo:/m.test(result.stderr);
+    if (!sudoOwn) {
+      throw new CLIError(
+        `pmset failed${detail ? `: ${detail}` : ` (exit ${result.code})`} - not a setup problem.`,
+        { code: "pmset_failed" },
+      );
+    }
+    const suffix = detail ? ` (${detail})` : ` (sudo exited ${result.code})`;
+    if (configured) {
+      throw new CLIError(
+        `The sudoers rule is installed but sudo refused the command${suffix}. Re-run \`awake setup\` to repair it (e.g. a missing #includedir line).`,
+        { exitCode: 3, code: "setup_required", hint: "awake setup" },
+      );
+    }
     throw new SetupRequiredError();
   }
 }

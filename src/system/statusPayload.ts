@@ -10,6 +10,11 @@ export interface StatusPayload {
   remaining_seconds: number | null;
   battery: BatteryInfo;
   sudoers_configured: boolean;
+  // Live probe: re-asserts the current switch position through the grant
+  // itself, so it needs no sudo timestamp and is always boolean. The menu
+  // prompts a repair when this is false. (Nullable only for forward
+  // compatibility with older CLI builds.)
+  sudoers_effective: boolean | null;
 }
 
 // Shared shape for status/on/off JSON output, so the menu bar app can read
@@ -20,6 +25,7 @@ export function buildStatusPayload(
   state: AwakeState | null,
   battery: BatteryInfo,
   sudoersConfigured: boolean,
+  sudoersEffective: boolean | null,
 ): StatusPayload {
   const until = state?.until ? new Date(state.until) : null;
   const remainingSeconds = until
@@ -35,5 +41,6 @@ export function buildStatusPayload(
     remaining_seconds: remainingSeconds,
     battery,
     sudoers_configured: sudoersConfigured,
+    sudoers_effective: sudoersEffective,
   };
 }

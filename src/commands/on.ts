@@ -4,7 +4,7 @@ import { cancelAutoOff, scheduleAutoOff } from "../system/launchd.js";
 import { getBattery, setSleepDisabled } from "../system/pmset.js";
 import { writeState } from "../system/state.js";
 import { buildStatusPayload } from "../system/statusPayload.js";
-import { isSudoersConfigured } from "../system/sudoers.js";
+import { checkRuleEffective, isSudoersConfigured } from "../system/sudoers.js";
 import {
   type GlobalFlags,
   resolveFormat,
@@ -80,6 +80,7 @@ Examples:
             state,
             battery,
             isSudoersConfigured(),
+            await checkRuleEffective(),
           );
           printJson({ ...payload, duration_seconds: durationSeconds });
           return;

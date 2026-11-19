@@ -7,7 +7,7 @@ Keep your Mac running with the lid closed. Safe by default, built for humans and
 macOS force-sleeps a laptop when the lid closes, no matter what `caffeinate` says. The only switch that overrides it is `pmset -a disablesleep 1`, which needs root. `awake` wraps that switch with the ergonomics and guardrails it deserves:
 
 - **Auto-off timer by default.** `awake on` keeps the Mac awake for 1 hour and then restores normal sleep on its own (via a `launchd` agent), so a forgotten toggle cannot drain your battery overnight.
-- **One-time passwordless setup.** `awake setup` installs a sudoers rule scoped to exactly two commands (`pmset -a disablesleep 1` and `... 0`) - nothing else gets elevated, and `awake setup --uninstall` removes it.
+- **One-time passwordless setup.** `awake setup` installs a sudoers rule scoped to exactly two commands (`pmset -a disablesleep 1` and `... 0`) - nothing else gets elevated, and `awake setup --uninstall` removes it. On stock macOS it also appends one `#includedir` line to `/etc/sudoers` (backed up, `visudo`-validated, auto-reverted on failure) so sudo reads the drop-in directory; `--uninstall` leaves that harmless line in place.
 - **Visible state.** The menu bar app shows a sun icon plus a live countdown while active, and notifies when the auto-off fires.
 - **Agent-friendly.** Every command supports `--json`, output follows a stable envelope, and exit codes are meaningful.
 
@@ -27,7 +27,15 @@ awake on 3h         # stay awake for 3 hours ("30m", "1h30m", "45" = minutes)
 awake on --forever  # no timer - until you run awake off
 awake off           # restore normal sleep now
 awake status        # current state, timer, battery
+awake setup --check    # liveness probe, no password (exit 0 only when live)
+awake setup --verify   # same probe, explicit name (exit 0/3)
 ```
+
+Re-running `awake setup` when healthy is a no-op (per-user drop-in, so one
+user's setup never revokes another's); when the rule is missing or stale
+(e.g. account renamed) it repairs. Every setup `--json` reply carries the
+same four keys: `{configured, effective, repaired, warning}` (`--check` /
+`--verify` use the `{configured, effective}` subset).
 
 ## Menu bar app
 
@@ -39,8 +47,10 @@ open mac/dist/Awake.app
 ```
 
 - Moon icon: off. Sun icon + countdown (e.g. `42m`): the Mac is being kept awake.
-- Toggle on for 30 min / 1 h / 2 h / until turned off; turn off any time.
-- In "forever" mode it reminds you every 30 minutes that it is still on.
+- Toggle on for 30 min / 1 h / 2 h / 4 h / 8 h / until turned off; turn off any time.
+- Refreshes itself every 15 seconds, so changes made via the CLI appear on their own; the menu shows a "Last checked" time plus any CLI error inline instead of failing silently. Manual Refresh always re-probes (no cached negative answers); before the first poll the menu shows "Checking status…" instead of a possibly-stale Off.
+- If the app can't find your CLI (e.g. installed under nvm/fnm/volta/asdf), point it at yours: `defaults write com.crafterstation.awake.menubar cliPath /path/to/awake` (or `AWAKE_CLI` env).
+- In "forever" mode it reminds you every hour that it is still on.
 - Add it to System Settings > General > Login Items to start at login.
 
 ## For agents
@@ -61,7 +71,7 @@ awake off --json       # done early - restore normal sleep
 
 - `awake on` runs `sudo -n pmset -a disablesleep 1` (allowed passwordless by the sudoers rule from setup), records state in `~/Library/Application Support/awake/`, and installs a `launchd` agent (`com.crafterstation.awake.autooff`) that runs `awake off --if-expired` at the deadline - and also at login, in case the deadline passed while the machine was off.
 - `awake off` flips the switch back, removes the launchd agent, and clears state.
-- The menu bar app polls `awake status --json` and shells out to the same CLI for toggles, so both surfaces always agree.
+- The menu bar app polls `awake status --json` every 15 seconds and shells out to the same CLI for toggles, so both surfaces always agree. Overlapping polls are skipped; a hung CLI call is killed after 20 seconds and surfaced in the menu.
 
 ## Safety notes
 

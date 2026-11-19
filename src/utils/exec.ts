@@ -57,3 +57,22 @@ export function spawnInteractive(cmd: string, args: string[]): Promise<number> {
     child.on("error", () => resolve(1));
   });
 }
+
+// Interactive child with piped stdin: lets Node hand exact bytes to a root
+// process (e.g. `sudo tee file`) with no attacker-writable file in between.
+// No shell is involved, so there is nothing to quote or inject through.
+export function spawnInteractiveWithInput(
+  cmd: string,
+  args: string[],
+  input: string,
+): Promise<number> {
+  logDebug(`spawn (interactive+stdin): ${cmd} ${args.join(" ")}`);
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { stdio: ["pipe", "inherit", "inherit"] });
+    child.on("error", () => resolve(1));
+    child.stdin.on("error", () => {});
+    child.stdin.write(input);
+    child.stdin.end();
+    child.on("close", (code) => resolve(code ?? 1));
+  });
+}

@@ -5,7 +5,11 @@ struct AwakeMenu: View {
     @ObservedObject var model: AwakeModel
 
     var body: some View {
-        Text(model.statusLine)
+        if model.loaded {
+            Text(model.statusLine)
+        } else {
+            Text("Checking status…")
+        }
         Divider()
 
         if model.status.enabled {
@@ -22,17 +26,36 @@ struct AwakeMenu: View {
 
         if !model.cliFound {
             Text("awake CLI not found")
-            Text("Install it, then relaunch this app")
+            Text("Install it, then press Refresh (a new shell PATH needs a relaunch)")
             Divider()
         } else if model.status.sudoersConfigured == false {
             Text("Run `awake setup` in a terminal first")
             Divider()
+        } else if model.status.sudoersEffective == false {
+            Text("Rule ignored by sudo - run `awake setup` to repair")
+            Divider()
         }
 
-        Button("Refresh status") { model.refresh() }
+        if let error = model.lastError {
+            Text(error)
+            Divider()
+        }
+
+        if let checked = model.lastChecked {
+            Text("Last checked \(Self.checkFormatter.string(from: checked))")
+        }
+
+        Button("Refresh status") { model.refreshManual() }
         Button("Quit Awake") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
     }
+
+    private static let checkFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .medium
+        formatter.dateStyle = .none
+        return formatter
+    }()
 
     @ViewBuilder
     private var durationButtons: some View {
